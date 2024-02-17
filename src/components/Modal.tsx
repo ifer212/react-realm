@@ -1,13 +1,24 @@
-import { FC, MouseEvent, useState } from 'react';
+import { FC, MouseEvent, useEffect, useState } from 'react';
+import { BSON } from 'realm-web';
 import CloseIcon from '../assets/svg/CloseIcon';
+import { IUser } from '../models/user.interface';
+import { app, credentials } from '../utils/mongo.client';
 
 export interface IModal {
   isOpen: boolean;
   isEdit: boolean;
   closeModal: () => void;
+  setUserValue: (id: string) => void;
+  editingId?: string;
 }
 
-const Modal: FC<IModal> = ({ isOpen, isEdit, closeModal }) => {
+const Modal: FC<IModal> = ({
+  isOpen,
+  isEdit,
+  closeModal,
+  setUserValue,
+  editingId,
+}) => {
   const [value, setValue] = useState({
     name: '',
     location: '',
@@ -26,10 +37,55 @@ const Modal: FC<IModal> = ({ isOpen, isEdit, closeModal }) => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(value);
+    const user: Realm.User = await app.logIn(credentials);
+    if (isEdit) {
+      const edit: Promise<IUser> = user.functions.editUser(
+        new BSON.ObjectID(editingId).toString(),
+        value.name,
+        value.location,
+        value.title
+      );
+      edit.then((resp) => {
+        setUserValue(resp._id!);
+        setValue({ name: '', location: '', title: '' });
+        closeModal();
+      });
+    } else {
+      const create = user.functions.createUser(
+        value.name,
+        value.location,
+        value.title
+      );
+      create.then((resp) => {
+        setUserValue(resp.insertedId);
+        setValue({ name: '', location: '', title: '' });
+      });
+    }
   };
+
+  useEffect(() => {
+    if (isEdit) {
+      const getSingleUser = async () => {
+        const user: Realm.User = await app.logIn(credentials);
+        const getUser: Promise<IUser> = user.functions.getSingleUser(
+          new BSON.ObjectID(editingId).toString()
+        );
+        getUser.then((resp) => {
+          setValue({
+            name: resp.name,
+            location: resp.location,
+            title: resp.title,
+          });
+        });
+      };
+      getSingleUser();
+    }
+    return () => {
+      setValue({ name: '', location: '', title: '' });
+    };
+  }, [isEdit]);
 
   return (
     <div
