@@ -191,7 +191,7 @@ module.exports = {
     container: {},
     content: [
       './public/index.html',
-      './src/**/*.{html,js}',
+      "./src/**/*.{js,jsx,ts,tsx}",
     ],
     contrast: {
       0: '0',
